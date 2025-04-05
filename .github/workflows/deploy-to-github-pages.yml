@@ -31,15 +31,17 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
       
-      - name: Install webpack dependencies
-        run: npm install --save-dev @expo/webpack-config --legacy-peer-deps
-      
       - name: Setup Pages
         uses: actions/configure-pages@v4
       
       - name: Build web app
         run: |
           npx expo export -p web
+      
+      - name: Copy CORS and CNAME files
+        run: |
+          mkdir -p dist/public
+          cp -r public/* dist/ || true
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

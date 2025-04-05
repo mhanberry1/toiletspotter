@@ -26,7 +26,8 @@
         "babel": {
           "include": ["@expo/vector-icons"]
         }
-      }
+      },
+      "domains": ["toiletspotter.org", "www.toiletspotter.org"]
     },
     "plugins": [
       "expo-router",
