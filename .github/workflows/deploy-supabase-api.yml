@@ -66,8 +66,6 @@ jobs:
           fi
 
       - name: Verify deployment
-        env:
-          SUPABASE_PROJECT_ID: yygzsbedvtepmaniffxo
         run: |
           echo "Verifying database deployment..."
-          PGPASSWORD=${{ secrets.SUPABASE_DB_PASSWORD }} psql -h db.$SUPABASE_PROJECT_ID.supabase.co -U postgres -d postgres -c "\dt public.*"
+          PGPASSWORD=${{ secrets.SUPABASE_DB_PASSWORD }} psql -h db.yygzsbedvtepmaniffxo.supabase.co -U postgres -d postgres -c "\dt public.*"
