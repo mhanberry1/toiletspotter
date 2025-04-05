@@ -1,0 +1,57 @@
+name: Deploy Supabase API
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'services/supabase-schema.sql'
+      - 'supabase/functions/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Login to Supabase
+        run: |
+          echo "${{ secrets.SUPABASE_ACCESS_TOKEN }}" | supabase login
+
+      - name: Deploy database schema
+        env:
+          SUPABASE_PROJECT_ID: yygzsbedvtepmaniffxo
+        run: |
+          # Try direct SQL execution via the REST API first (more reliable)
+          if [ -f "services/supabase-schema.sql" ]; then
+            echo "Deploying database schema via REST API..."
+            supabase db execute --project-ref $SUPABASE_PROJECT_ID --file services/supabase-schema.sql
+          fi
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_PROJECT_ID: yygzsbedvtepmaniffxo
+        run: |
+          # Check if functions directory exists
+          if [ -d "supabase/functions" ]; then
+            echo "Deploying Supabase Edge Functions..."
+            supabase functions deploy --project-ref $SUPABASE_PROJECT_ID
+          else
+            echo "No functions directory found, skipping function deployment"
+          fi
+
+      - name: Verify deployment
+        env:
+          SUPABASE_PROJECT_ID: yygzsbedvtepmaniffxo
+        run: |
+          echo "Verifying database deployment..."
+          supabase db execute --project-ref $SUPABASE_PROJECT_ID -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
+          
+          echo "Verifying functions deployment..."
+          supabase functions list --project-ref $SUPABASE_PROJECT_ID
