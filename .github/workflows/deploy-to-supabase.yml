@@ -1,0 +1,109 @@
+name: Deploy to Supabase
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'services/supabase-schema.sql'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      
+      - name: Install Supabase JS Client
+        run: npm install @supabase/supabase-js
+      
+      - name: Deploy SQL schema via REST API
+        env:
+          SUPABASE_URL: https://yygzsbedvtepmaniffxo.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          # Read the SQL file content
+          SQL_CONTENT=$(cat ./services/supabase-schema.sql)
+          
+          # Create a temporary Node.js script to execute the SQL
+          cat > deploy-schema.js << 'EOF'
+          const { createClient } = require('@supabase/supabase-js');
+          
+          async function deploySchema() {
+            const supabaseUrl = process.env.SUPABASE_URL;
+            const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+            const sqlContent = process.env.SQL_CONTENT;
+            
+            if (!supabaseUrl || !supabaseKey) {
+              console.error('Missing Supabase credentials');
+              process.exit(1);
+            }
+            
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            
+            try {
+              // Execute the SQL via the REST API
+              const { error } = await supabase.rpc('exec_sql', { sql_query: sqlContent });
+              
+              if (error) {
+                console.error('Error executing SQL:', error);
+                process.exit(1);
+              }
+              
+              console.log('Database schema successfully deployed!');
+            } catch (err) {
+              console.error('Deployment error:', err);
+              process.exit(1);
+            }
+          }
+          
+          deploySchema();
+          EOF
+          
+          # Execute the deployment script
+          SQL_CONTENT="$SQL_CONTENT" node deploy-schema.js
+      
+      - name: Verify deployment
+        env:
+          SUPABASE_URL: https://yygzsbedvtepmaniffxo.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          # Create a verification script
+          cat > verify-schema.js << 'EOF'
+          const { createClient } = require('@supabase/supabase-js');
+          
+          async function verifySchema() {
+            const supabaseUrl = process.env.SUPABASE_URL;
+            const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+            
+            const supabase = createClient(supabaseUrl, supabaseKey);
+            
+            try {
+              // Check if the bathroom_codes table exists
+              const { data, error } = await supabase
+                .from('bathroom_codes')
+                .select('id')
+                .limit(1);
+              
+              if (error) {
+                console.error('Verification failed:', error);
+                process.exit(1);
+              }
+              
+              console.log('Schema verification successful!');
+            } catch (err) {
+              console.error('Verification error:', err);
+              process.exit(1);
+            }
+          }
+          
+          verifySchema();
+          EOF
+          
+          # Execute the verification script
+          node verify-schema.js
