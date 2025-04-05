@@ -1,50 +1,76 @@
-# Welcome to your Expo app 👋
+# 🚽 Toilet Spotter
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Toilet Spotter is a cross-platform mobile/web application that helps users find and share access codes to locked public restrooms anonymously.
 
-## Get started
+## 📱 Features
 
-1. Install dependencies
+- Anonymously post bathroom door codes pinned to your current location
+- View nearby codes on a map or in a list view
+- Upvote or downvote codes to help ensure accuracy
+- No user accounts or sign-up required
+- Complete privacy - no business names or personal data stored
+- Works on iOS, Android, and Web browsers
 
+## 🛠️ Tech Stack
+
+- **Frontend**: React Native with Expo
+- **Backend**: Firebase/Supabase
+- **Database**: Firestore/Supabase
+- **Maps**: Google Maps/Mapbox
+- **Deployment**: Expo EAS
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (LTS version recommended)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+- [Expo CLI](https://docs.expo.dev/workflow/expo-cli/)
+
+### Installation
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/yourusername/toiletspotter.git
+   cd toiletspotter
+   ```
+
+2. Install dependencies
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. Start the development server
    ```bash
-    npx expo start
+   npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+4. Run on your preferred platform
+   - Press `i` to run on iOS simulator
+   - Press `a` to run on Android emulator
+   - Press `w` to run on web browser
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📋 Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+toiletspotter/
+├── app/                # Main application code (Expo Router)
+│   ├── (tabs)/         # Tab-based navigation
+│   ├── modals/         # Modal screens
+├── assets/             # Static assets (images, fonts)
+├── components/         # Reusable UI components
+├── hooks/              # Custom React hooks
+├── services/           # API and backend services
+├── utils/              # Utility functions
+├── PRD.md              # Product Requirements Document
+├── todo.md             # Development To-Do List
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 📝 Documentation
 
-## Learn more
+- See [PRD.md](./PRD.md) for detailed product requirements
+- See [todo.md](./todo.md) for development phases and tasks
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📄 License
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This project is licensed under the MIT License - see the LICENSE file for details.
