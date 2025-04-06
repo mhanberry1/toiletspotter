@@ -16,6 +16,7 @@ export const Map: React.FC<MapProps> = ({ style }) => {
   const [fetchingBathrooms, setFetchingBathrooms] = useState(false);
   const [isAddingBathroom, setIsAddingBathroom] = useState(false);
   const [addingBathroomStatus, setAddingBathroomStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [selectedBathroom, setSelectedBathroom] = useState<BathroomCode | null>(null);
   
   // Use refs instead of state for input fields
   const bathroomCodeRef = useRef<HTMLInputElement>(null);
@@ -290,10 +291,8 @@ export const Map: React.FC<MapProps> = ({ style }) => {
               }}
               title={bathroom.description || `Code: ${bathroom.code}`}
               onClick={() => {
-                // Alert with bathroom details when clicked
-                if (typeof window !== 'undefined') {
-                  window.alert(`Bathroom Code: ${bathroom.code}\nLocation: ${bathroom.description || 'Unknown'}\nRating: ${bathroom.vote_score || 'No ratings yet'}\nDistance: ${bathroom.distance ? Math.round(bathroom.distance) + 'm' : 'Unknown'}`);
-                }
+                // Show bathroom details in modal instead of alert
+                setSelectedBathroom(bathroom);
               }}
             >
               <div
@@ -583,6 +582,150 @@ export const Map: React.FC<MapProps> = ({ style }) => {
     );
   };
 
+  // Component for the bathroom details modal
+  const BathroomDetailsModal = () => {
+    if (!selectedBathroom) return null;
+    
+    // Function to determine rating text based on vote score
+    const getRatingText = (score?: number) => {
+      if (score === undefined) return 'No ratings yet';
+      if (score >= 8) return 'Excellent';
+      if (score >= 5) return 'Good';
+      if (score >= 0) return 'Average';
+      return 'Poor';
+    };
+    
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '20px',
+            width: '80%',
+            maxWidth: '400px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          }}
+        >
+          <h3 style={{ margin: '0 0 16px', color: '#333', fontSize: '18px' }}>
+            Bathroom Details
+          </h3>
+          
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '4px',
+              marginBottom: '12px'
+            }}>
+              <div style={{ 
+                fontSize: '16px', 
+                fontWeight: 'bold', 
+                marginBottom: '4px',
+                color: '#333'
+              }}>
+                Code: {selectedBathroom.code}
+              </div>
+              
+              {selectedBathroom.description && (
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#666',
+                  marginBottom: '4px'
+                }}>
+                  Location: {selectedBathroom.description}
+                </div>
+              )}
+              
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                marginTop: '8px'
+              }}>
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#666',
+                  marginRight: '8px'
+                }}>
+                  Rating: 
+                </div>
+                <div style={{
+                  backgroundColor: selectedBathroom.vote_score !== undefined 
+                    ? (selectedBathroom.vote_score >= 8 
+                      ? '#34c759' 
+                      : selectedBathroom.vote_score >= 5 
+                        ? '#ffcc00' 
+                        : selectedBathroom.vote_score >= 0 
+                          ? '#ff9500' 
+                          : '#ff3b30')
+                    : '#999',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}>
+                  {selectedBathroom.vote_score !== undefined 
+                    ? `${selectedBathroom.vote_score}/10 - ${getRatingText(selectedBathroom.vote_score)}` 
+                    : 'No ratings yet'}
+                </div>
+              </div>
+              
+              {selectedBathroom.distance !== undefined && (
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#666',
+                  marginTop: '8px'
+                }}>
+                  Distance: {Math.round(selectedBathroom.distance)}m
+                </div>
+              )}
+              
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#999',
+                marginTop: '12px'
+              }}>
+                Coordinates: {selectedBathroom.latitude.toFixed(6)}, {selectedBathroom.longitude.toFixed(6)}
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setSelectedBathroom(null)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: '#f1f1f1',
+                color: '#333',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <View style={[styles.container, style]}>
       {Platform.OS === 'web' && typeof window !== 'undefined' && (
@@ -668,6 +811,9 @@ export const Map: React.FC<MapProps> = ({ style }) => {
           
           {/* Add Bathroom Modal */}
           <AddBathroomModal />
+          
+          {/* Bathroom Details Modal */}
+          <BathroomDetailsModal />
           
           {/* Bathroom count indicator */}
           {!error && nearbyBathrooms.length > 0 && (
