@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Platform, TouchableOpacity, Linking } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
-import { getNearbyBathroomCodes, BathroomCode } from '../services/bathroomCodeService';
+import { getNearbyBathroomCodes, addBathroomCode, BathroomCode } from '../services/bathroomCodeService';
 
 interface MapProps {
   style?: any;
@@ -14,6 +14,12 @@ export const Map: React.FC<MapProps> = ({ style }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [nearbyBathrooms, setNearbyBathrooms] = useState<BathroomCode[]>([]);
   const [fetchingBathrooms, setFetchingBathrooms] = useState(false);
+  const [isAddingBathroom, setIsAddingBathroom] = useState(false);
+  const [addingBathroomStatus, setAddingBathroomStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  
+  // Use refs instead of state for input fields
+  const bathroomCodeRef = useRef<HTMLInputElement>(null);
+  const bathroomDescriptionRef = useRef<HTMLInputElement>(null);
 
   // Default map center (Capitol Hill, Seattle)
   const defaultCenter = {
@@ -333,6 +339,195 @@ export const Map: React.FC<MapProps> = ({ style }) => {
     );
   };
 
+  // Function to handle adding a new bathroom
+  const handleAddBathroom = async () => {
+    if (!location) {
+      alert('Cannot add bathroom: your location is not available');
+      return;
+    }
+    
+    const codeValue = bathroomCodeRef.current?.value || '';
+    
+    if (!codeValue) {
+      alert('Please enter a bathroom code');
+      return;
+    }
+    
+    try {
+      setAddingBathroomStatus('loading');
+      
+      const newBathroom: BathroomCode = {
+        code: codeValue,
+        description: bathroomDescriptionRef.current?.value || undefined,
+        latitude: location.lat,
+        longitude: location.lng,
+      };
+      
+      const result = await addBathroomCode(newBathroom);
+      
+      if (result) {
+        setAddingBathroomStatus('success');
+        // Add the new bathroom to the list
+        setNearbyBathrooms(prev => [...prev, result]);
+        // Reset form
+        if (bathroomCodeRef.current) bathroomCodeRef.current.value = '';
+        if (bathroomDescriptionRef.current) bathroomDescriptionRef.current.value = '';
+        // Close modal
+        setTimeout(() => {
+          setIsAddingBathroom(false);
+          setAddingBathroomStatus('idle');
+        }, 1500);
+      } else {
+        setAddingBathroomStatus('error');
+        alert('Failed to add bathroom. It might be a duplicate code in this area.');
+      }
+    } catch (err) {
+      console.error('Error adding bathroom:', err);
+      setAddingBathroomStatus('error');
+      alert('An error occurred while adding the bathroom');
+    }
+  };
+
+  // Component for the add bathroom modal
+  const AddBathroomModal = () => {
+    if (!isAddingBathroom) return null;
+    
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '20px',
+            width: '80%',
+            maxWidth: '400px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          }}
+        >
+          <h3 style={{ margin: '0 0 16px', color: '#333', fontSize: '18px' }}>
+            Add New Bathroom
+          </h3>
+          
+          <p style={{ margin: '0 0 16px', color: '#666', fontSize: '14px' }}>
+            Adding a bathroom at your current location. Make sure you're standing near the bathroom entrance.
+          </p>
+          
+          <div style={{ marginBottom: '16px' }}>
+            <label 
+              htmlFor="bathroomCode" 
+              style={{ 
+                display: 'block', 
+                marginBottom: '4px', 
+                color: '#333',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              Bathroom Code* (required)
+            </label>
+            <input
+              id="bathroomCode"
+              type="text"
+              ref={bathroomCodeRef}
+              placeholder="Enter the code to access this bathroom"
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '16px',
+              }}
+              maxLength={10}
+              required
+            />
+          </div>
+          
+          <div style={{ marginBottom: '20px' }}>
+            <label 
+              htmlFor="bathroomDescription" 
+              style={{ 
+                display: 'block', 
+                marginBottom: '4px', 
+                color: '#333',
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}
+            >
+              Description (optional)
+            </label>
+            <input
+              id="bathroomDescription"
+              type="text"
+              ref={bathroomDescriptionRef}
+              placeholder="e.g., Starbucks on 2nd floor"
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '16px',
+              }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <button
+              onClick={() => {
+                setIsAddingBathroom(false);
+                setAddingBathroomStatus('idle');
+                // No need to reset values, they'll be reset when the component unmounts
+              }}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: '#f1f1f1',
+                color: '#333',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            
+            <button
+              onClick={handleAddBathroom}
+              disabled={addingBathroomStatus === 'loading'}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: addingBathroomStatus === 'success' ? '#34c759' : '#ff4757',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: addingBathroomStatus === 'loading' ? 'not-allowed' : 'pointer',
+                opacity: addingBathroomStatus === 'loading' ? 0.7 : 1,
+              }}
+            >
+              {addingBathroomStatus === 'loading' ? 'Adding...' : 
+               addingBathroomStatus === 'success' ? 'Added!' : 'Add Bathroom'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <View style={[styles.container, style]}>
       {Platform.OS === 'web' && typeof window !== 'undefined' && (
@@ -363,6 +558,43 @@ export const Map: React.FC<MapProps> = ({ style }) => {
           />
           {!error && <CustomMarker />}
           {!error && <BathroomMarkers />}
+          
+          {/* Add Bathroom Button */}
+          {!error && location && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '20px',
+                right: '20px',
+                zIndex: 1000,
+              }}
+            >
+              <button
+                onClick={() => setIsAddingBathroom(true)}
+                style={{
+                  backgroundColor: '#ff4757',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '56px',
+                  height: '56px',
+                  fontSize: '24px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+                title="Add new bathroom at your location"
+              >
+                +
+              </button>
+            </div>
+          )}
+          
+          {/* Add Bathroom Modal */}
+          <AddBathroomModal />
           
           {/* Bathroom count indicator */}
           {!error && nearbyBathrooms.length > 0 && (
