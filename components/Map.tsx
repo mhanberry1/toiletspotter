@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Platform, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Platform, TouchableOpacity, Linking } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 
@@ -22,44 +22,110 @@ export const Map: React.FC<MapProps> = ({ style }) => {
     setIsLoading(true);
     setError(null);
     
+    // Check if we're in an iframe, which might cause permission issues
+    const isInIframe = () => {
+      try {
+        return typeof window !== 'undefined' && window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    };
+
+    if (isInIframe()) {
+      console.log('Map is in an iframe, which may restrict geolocation access');
+      setError('This map may have limited functionality because it\'s running in an embedded view. For full features, please open the app directly.');
+      setLocation(defaultCenter);
+      setIsLoading(false);
+      return;
+    }
+    
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setIsLoading(false);
-        },
-        (err) => {
-          console.error('Error getting location:', err);
-          // More user-friendly error message with instructions
-          if (err.code === 1) {
-            // Permission denied
-            setError('Location permission denied. To enable, check your browser settings and allow location access for this site.');
-          } else if (err.code === 2) {
-            // Position unavailable
-            setError('Your location is currently unavailable. Please try again later.');
-          } else if (err.code === 3) {
-            // Timeout
-            setError('Location request timed out. Please check your connection and try again.');
-          } else {
-            setError('Unable to retrieve your location. Please enable location services in your browser settings.');
+      try {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+            setIsLoading(false);
+          },
+          (err) => {
+            // More detailed error logging
+            console.error('Error getting location:', JSON.stringify({
+              code: err.code,
+              message: err.message,
+              PERMISSION_DENIED: err.PERMISSION_DENIED,
+              POSITION_UNAVAILABLE: err.POSITION_UNAVAILABLE,
+              TIMEOUT: err.TIMEOUT
+            }));
+            
+            // Handle permissions policy error specifically
+            if (err.message && err.message.includes('permissions policy')) {
+              setError('Geolocation has been disabled by security settings. This may happen in development mode or when using certain browsers. We\'re showing a default location instead.');
+            } 
+            // Handle other errors
+            else if (err.code === 1) {
+              // Permission denied
+              setError(getBrowserSpecificLocationInstructions());
+            } else if (err.code === 2) {
+              // Position unavailable
+              setError('Your location is currently unavailable. Please try again later or check if your device has GPS enabled.');
+            } else if (err.code === 3) {
+              // Timeout
+              setError('Location request timed out. Please check your connection and try again.');
+            } else {
+              setError('Unable to retrieve your location. Please enable location services in your browser settings.');
+            }
+            
+            // Always set a default location when there's an error
+            setLocation(defaultCenter);
+            setIsLoading(false);
+          },
+          { 
+            enableHighAccuracy: true, 
+            timeout: 10000,  // Reduced timeout to 10 seconds
+            maximumAge: 0    // Always get a fresh position
           }
-          setIsLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-      );
+        );
+      } catch (e) {
+        console.error('Exception when requesting geolocation:', e);
+        setError('An unexpected error occurred when accessing your location. We\'re showing a default location instead.');
+        setLocation(defaultCenter);
+        setIsLoading(false);
+      }
     } else {
       setError('Geolocation is not supported by your browser.');
+      setLocation(defaultCenter);
       setIsLoading(false);
+    }
+  };
+
+  // Function to get browser-specific instructions
+  const getBrowserSpecificLocationInstructions = () => {
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    
+    if (userAgent.indexOf('Chrome') > -1) {
+      return 'Location permission denied. To enable: Click the lock icon in the address bar → Site settings → Location → Allow.';
+    } else if (userAgent.indexOf('Firefox') > -1) {
+      return 'Location permission denied. To enable: Click the lock icon in the address bar → Connection secure → More information → Permissions → Access Your Location → Allow.';
+    } else if (userAgent.indexOf('Safari') > -1) {
+      return 'Location permission denied. To enable: Click Safari in the menu → Preferences → Websites → Location → Allow for this website.';
+    } else if (userAgent.indexOf('Edge') > -1) {
+      return 'Location permission denied. To enable: Click the lock icon in the address bar → Site permissions → Location → Allow.';
+    } else {
+      return 'Location permission denied. Please check your browser settings and allow location access for this site.';
     }
   };
 
   useEffect(() => {
     // Request location when component mounts
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      requestLocation();
+      // Add a small delay to ensure the component is fully mounted
+      const timer = setTimeout(() => {
+        requestLocation();
+      }, 500);
+      
+      return () => clearTimeout(timer);
     } else {
       // For non-web platforms, just set a default location for now
       setLocation(defaultCenter);
@@ -89,6 +155,9 @@ export const Map: React.FC<MapProps> = ({ style }) => {
   // Create OpenStreetMap URL with the location
   const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter.lng - 0.01}%2C${mapCenter.lat - 0.01}%2C${mapCenter.lng + 0.01}%2C${mapCenter.lat + 0.01}&amp;layer=mapnik&amp;marker=${mapCenter.lat}%2C${mapCenter.lng}`;
 
+  // Direct link to OpenStreetMap for the location
+  const openMapUrl = `https://www.openstreetmap.org/?mlat=${mapCenter.lat}&mlon=${mapCenter.lng}#map=15/${mapCenter.lat}/${mapCenter.lng}`;
+
   return (
     <View style={[styles.container, style]}>
       {Platform.OS === 'web' && typeof window !== 'undefined' && (
@@ -109,14 +178,29 @@ export const Map: React.FC<MapProps> = ({ style }) => {
         <View style={styles.errorOverlay}>
           <ThemedView style={styles.errorContainer}>
             <ThemedText style={styles.errorText}>{error}</ThemedText>
-            <TouchableOpacity 
-              style={styles.retryButton} 
-              onPress={requestLocation}
-            >
-              <ThemedText style={styles.retryButtonText}>Try Again</ThemedText>
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity 
+                style={styles.retryButton} 
+                onPress={requestLocation}
+              >
+                <ThemedText style={styles.retryButtonText}>Try Again</ThemedText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.openMapButton} 
+                onPress={() => {
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.open(openMapUrl, '_blank');
+                  } else {
+                    Linking.openURL(openMapUrl);
+                  }
+                }}
+              >
+                <ThemedText style={styles.openMapButtonText}>Open in Maps</ThemedText>
+              </TouchableOpacity>
+            </View>
             <ThemedText style={styles.helpText}>
-              Meanwhile, we're showing a default location map.
+              We're showing a default location map for now.
             </ThemedText>
           </ThemedView>
         </View>
@@ -154,14 +238,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   retryButton: {
     backgroundColor: '#0077ff',
     borderRadius: 4,
     padding: 10,
     alignItems: 'center',
-    marginBottom: 8,
+    flex: 1,
+    marginRight: 8,
   },
   retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  openMapButton: {
+    backgroundColor: '#34c759',
+    borderRadius: 4,
+    padding: 10,
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 8,
+  },
+  openMapButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
