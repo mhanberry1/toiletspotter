@@ -72,7 +72,7 @@ export const Map: React.FC<MapProps> = ({ style }) => {
       return;
     }
     
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && navigator.geolocation) {
       try {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -611,6 +611,24 @@ export const Map: React.FC<MapProps> = ({ style }) => {
               background: 'transparent'
             }}
           />
+          
+          {/* CSS to hide any OpenStreetMap attribution or footer */}
+          <style>
+            {`
+              iframe {
+                overflow: hidden;
+              }
+              iframe + div {
+                display: none !important;
+              }
+              .leaflet-control-attribution,
+              .leaflet-control,
+              .leaflet-bottom {
+                display: none !important;
+              }
+            `}
+          </style>
+          
           {!error && <CustomMarker />}
           {!error && <BathroomMarkers />}
           
