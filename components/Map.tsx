@@ -357,34 +357,48 @@ export const Map: React.FC<MapProps> = ({ style }) => {
       setAddingBathroomStatus('loading');
       
       const newBathroom: BathroomCode = {
-        code: codeValue,
-        description: bathroomDescriptionRef.current?.value || undefined,
+        code: codeValue.trim(),
+        description: bathroomDescriptionRef.current?.value?.trim() || undefined,
         latitude: location.lat,
         longitude: location.lng,
       };
       
+      console.log('Adding new bathroom:', newBathroom);
       const result = await addBathroomCode(newBathroom);
       
       if (result) {
+        console.log('Successfully added bathroom:', result);
         setAddingBathroomStatus('success');
-        // Add the new bathroom to the list
-        setNearbyBathrooms(prev => [...prev, result]);
+        
+        // Add the new bathroom to the list and sort by distance
+        setNearbyBathrooms(prev => {
+          const updated = [...prev, result].sort((a, b) => {
+            const distA = a.distance || 0;
+            const distB = b.distance || 0;
+            return distA - distB;
+          });
+          return updated;
+        });
+        
         // Reset form
         if (bathroomCodeRef.current) bathroomCodeRef.current.value = '';
         if (bathroomDescriptionRef.current) bathroomDescriptionRef.current.value = '';
-        // Close modal
+        
+        // Show success message and close modal
+        alert(`Bathroom code "${result.code}" successfully added!`);
         setTimeout(() => {
           setIsAddingBathroom(false);
           setAddingBathroomStatus('idle');
-        }, 1500);
+        }, 1000);
       } else {
+        console.error('Failed to add bathroom - null result returned');
         setAddingBathroomStatus('error');
         alert('Failed to add bathroom. It might be a duplicate code in this area.');
       }
     } catch (err) {
       console.error('Error adding bathroom:', err);
       setAddingBathroomStatus('error');
-      alert('An error occurred while adding the bathroom');
+      alert('An error occurred while adding the bathroom. Please try again later.');
     }
   };
 
@@ -424,6 +438,20 @@ export const Map: React.FC<MapProps> = ({ style }) => {
           <p style={{ margin: '0 0 16px', color: '#666', fontSize: '14px' }}>
             Adding a bathroom at your current location. Make sure you're standing near the bathroom entrance.
           </p>
+          
+          {/* Location info */}
+          {location && (
+            <div style={{ 
+              marginBottom: '16px', 
+              padding: '8px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '4px',
+              fontSize: '12px',
+              color: '#666'
+            }}>
+              <strong>Location:</strong> {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+            </div>
+          )}
           
           <div style={{ marginBottom: '16px' }}>
             <label 
@@ -517,12 +545,39 @@ export const Map: React.FC<MapProps> = ({ style }) => {
                 fontWeight: 'bold',
                 cursor: addingBathroomStatus === 'loading' ? 'not-allowed' : 'pointer',
                 opacity: addingBathroomStatus === 'loading' ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {addingBathroomStatus === 'loading' ? 'Adding...' : 
-               addingBathroomStatus === 'success' ? 'Added!' : 'Add Bathroom'}
+              {addingBathroomStatus === 'loading' ? (
+                <>
+                  <div 
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      marginRight: '8px',
+                      animation: 'spin 1s linear infinite',
+                    }}
+                  />
+                  Adding...
+                </>
+              ) : addingBathroomStatus === 'success' ? 'Added!' : 'Add Bathroom'}
             </button>
           </div>
+          
+          {/* Add a style for the spinner animation */}
+          <style>
+            {`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}
+          </style>
         </div>
       </div>
     );
