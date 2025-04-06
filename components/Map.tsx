@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Platform, TouchableOpacity, Linking } from 'react-native';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import { getNearbyBathroomCodes, BathroomCode } from '../services/bathroomCodeService';
 
 interface MapProps {
   style?: any;
@@ -11,12 +12,38 @@ export const Map: React.FC<MapProps> = ({ style }) => {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [nearbyBathrooms, setNearbyBathrooms] = useState<BathroomCode[]>([]);
+  const [fetchingBathrooms, setFetchingBathrooms] = useState(false);
 
-  // Default map center (San Francisco)
+  // Default map center (Capitol Hill, Seattle)
   const defaultCenter = {
-    lat: 37.7749,
-    lng: -122.4194,
+    lat: 47.6169,
+    lng: -122.3201,
   };
+
+  // Fetch nearby bathrooms when location is available
+  useEffect(() => {
+    const fetchBathrooms = async () => {
+      if (!location) return;
+      
+      try {
+        setFetchingBathrooms(true);
+        const bathrooms = await getNearbyBathroomCodes(
+          location.lat,
+          location.lng,
+          2000 // 2km radius - increased from 1km for better coverage
+        );
+        console.log(`Found ${bathrooms.length} bathrooms nearby`);
+        setNearbyBathrooms(bathrooms);
+      } catch (err) {
+        console.error('Error fetching nearby bathrooms:', err);
+      } finally {
+        setFetchingBathrooms(false);
+      }
+    };
+
+    fetchBathrooms();
+  }, [location]);
 
   const requestLocation = () => {
     setIsLoading(true);
@@ -154,7 +181,8 @@ export const Map: React.FC<MapProps> = ({ style }) => {
   
   // Create OpenStreetMap URL with the location and a more prominent marker
   // Using the custom marker icon parameter for better visibility
-  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter.lng - 0.01}%2C${mapCenter.lat - 0.01}%2C${mapCenter.lng + 0.01}%2C${mapCenter.lat + 0.01}&amp;layer=mapnik&amp;marker=${mapCenter.lat}%2C${mapCenter.lng}`;
+  // Adding parameters to disable dragging and zooming
+  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter.lng - 0.01}%2C${mapCenter.lat - 0.01}%2C${mapCenter.lng + 0.01}%2C${mapCenter.lat + 0.01}&amp;layer=mapnik&amp;marker=${mapCenter.lat}%2C${mapCenter.lng}&amp;attribution=0&amp;embed=1&amp;zoom=15`;
 
   // Direct link to OpenStreetMap for the location
   const openMapUrl = `https://www.openstreetmap.org/?mlat=${mapCenter.lat}&mlon=${mapCenter.lng}#map=15/${mapCenter.lat}/${mapCenter.lng}`;
@@ -204,6 +232,107 @@ export const Map: React.FC<MapProps> = ({ style }) => {
     </div>
   );
 
+  // Create bathroom markers
+  const BathroomMarkers = () => {
+    // Calculate relative positions based on the map viewport
+    // The map shows an area of 0.02 degrees in both lat and lng (from mapUrl)
+    const calculatePosition = (bathroom: BathroomCode) => {
+      if (!mapCenter) return { top: '50%', left: '50%' };
+      
+      // Calculate the percentage position within the viewport
+      const latRange = 0.02; // Total latitude range shown in the map
+      const lngRange = 0.02; // Total longitude range shown in the map
+      
+      const latMin = mapCenter.lat - latRange/2;
+      const lngMin = mapCenter.lng - lngRange/2;
+      
+      // Calculate percentage position (0-100%)
+      const topPercentage = 100 - ((bathroom.latitude - latMin) / latRange * 100);
+      const leftPercentage = (bathroom.longitude - lngMin) / lngRange * 100;
+      
+      return {
+        top: `${topPercentage}%`,
+        left: `${leftPercentage}%`,
+      };
+    };
+
+    // Function to determine marker color based on vote score
+    const getMarkerColor = (score?: number) => {
+      if (score === undefined) return '#34c759'; // Default green
+      if (score >= 8) return '#34c759'; // Good - green
+      if (score >= 5) return '#ffcc00'; // Medium - yellow
+      if (score >= 0) return '#ff9500'; // Low - orange
+      return '#ff3b30'; // Negative - red
+    };
+
+    return (
+      <>
+        {nearbyBathrooms.map((bathroom) => {
+          const position = calculatePosition(bathroom);
+          const markerColor = getMarkerColor(bathroom.vote_score);
+          
+          return (
+            <div
+              key={bathroom.id}
+              style={{
+                position: 'absolute',
+                top: position.top,
+                left: position.left,
+                transform: 'translate(-50%, -50%)',
+                zIndex: 900,
+                cursor: 'pointer',
+              }}
+              title={bathroom.description || `Code: ${bathroom.code}`}
+              onClick={() => {
+                // Alert with bathroom details when clicked
+                if (typeof window !== 'undefined') {
+                  window.alert(`Bathroom Code: ${bathroom.code}\nLocation: ${bathroom.description || 'Unknown'}\nRating: ${bathroom.vote_score || 'No ratings yet'}\nDistance: ${bathroom.distance ? Math.round(bathroom.distance) + 'm' : 'Unknown'}`);
+                }
+              }}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  backgroundColor: markerColor,
+                  border: '2px solid white',
+                  boxShadow: '0 0 8px rgba(0, 0, 0, 0.4)',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  fontSize: '12px',
+                  color: 'white',
+                  fontWeight: 'bold',
+                }}
+              >
+                🚻
+              </div>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  whiteSpace: 'nowrap',
+                  marginTop: '3px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
+                  pointerEvents: 'none',
+                }}
+              >
+                {bathroom.code}
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
   return (
     <View style={[styles.container, style]}>
       {Platform.OS === 'web' && typeof window !== 'undefined' && (
@@ -214,12 +343,65 @@ export const Map: React.FC<MapProps> = ({ style }) => {
               height: '100%', 
               width: '100%', 
               border: 'none',
-              borderRadius: '8px'
+              borderRadius: '8px',
+              pointerEvents: 'none' // Disable all pointer events to prevent interaction
             }}
             title="OpenStreetMap"
             allowFullScreen
           />
+          {/* Overlay div to prevent any interaction with the map */}
+          <div 
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 800, // Below markers but above map
+              background: 'transparent'
+            }}
+          />
           {!error && <CustomMarker />}
+          {!error && <BathroomMarkers />}
+          
+          {/* Bathroom count indicator */}
+          {!error && nearbyBathrooms.length > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#333',
+              }}
+            >
+              {nearbyBathrooms.length} {nearbyBathrooms.length === 1 ? 'bathroom' : 'bathrooms'} nearby
+            </div>
+          )}
+          
+          {/* Loading indicator for bathrooms */}
+          {!error && fetchingBathrooms && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                padding: '8px 12px',
+                borderRadius: '20px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                fontSize: '14px',
+                color: '#333',
+              }}
+            >
+              Finding bathrooms...
+            </div>
+          )}
         </div>
       )}
       

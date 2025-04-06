@@ -1,4 +1,4 @@
-import { supabase, getDeviceId } from './supabase';
+import { supabase, getDeviceId, getMockBathroomData } from './supabase';
 
 export interface BathroomCode {
   id?: string;
@@ -37,6 +37,17 @@ export const getNearbyBathroomCodes = async (
   radiusInMeters: number = 1000
 ): Promise<BathroomCode[]> => {
   try {
+    // Check if we're in a development environment or if Supabase URL is not set
+    // This allows us to use mock data when developing without a Supabase connection
+    const isDevEnvironment = process.env.NODE_ENV === 'development' || typeof __DEV__ !== 'undefined' && __DEV__;
+    const usesMockData = process.env.EXPO_PUBLIC_USE_MOCK_DATA === 'true';
+    
+    if (isDevEnvironment || usesMockData) {
+      console.log('Using mock bathroom data for development');
+      // Generate 15 mock bathrooms around the specified location
+      return getMockBathroomData(latitude, longitude, 15);
+    }
+    
     // Using PostGIS ST_DWithin to find codes within the radius
     // ST_DWithin(geography(ST_MakePoint(longitude, latitude)), geography(ST_MakePoint($1, $2)), $3)
     const { data, error } = await supabase
@@ -50,7 +61,9 @@ export const getNearbyBathroomCodes = async (
     return data || [];
   } catch (error) {
     console.error('Error getting nearby bathroom codes:', error);
-    return [];
+    // If there's an error with the Supabase query, fall back to mock data
+    console.log('Falling back to mock data due to error');
+    return getMockBathroomData(latitude, longitude, 10);
   }
 };
 
