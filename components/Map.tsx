@@ -152,26 +152,75 @@ export const Map: React.FC<MapProps> = ({ style }) => {
   // Use the user's location or fall back to the default
   const mapCenter = location || defaultCenter;
   
-  // Create OpenStreetMap URL with the location
+  // Create OpenStreetMap URL with the location and a more prominent marker
+  // Using the custom marker icon parameter for better visibility
   const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter.lng - 0.01}%2C${mapCenter.lat - 0.01}%2C${mapCenter.lng + 0.01}%2C${mapCenter.lat + 0.01}&amp;layer=mapnik&amp;marker=${mapCenter.lat}%2C${mapCenter.lng}`;
 
   // Direct link to OpenStreetMap for the location
   const openMapUrl = `https://www.openstreetmap.org/?mlat=${mapCenter.lat}&mlon=${mapCenter.lng}#map=15/${mapCenter.lat}/${mapCenter.lng}`;
 
+  // Create a custom marker element to overlay on the map
+  const CustomMarker = () => (
+    <div 
+      style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 1000,
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          width: '20px',
+          height: '20px',
+          borderRadius: '50%',
+          backgroundColor: '#ff4757',
+          border: '3px solid white',
+          boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '12px',
+          height: '12px',
+          backgroundColor: 'white',
+          borderRadius: '50%',
+          marginTop: '5px',
+          fontSize: '10px',
+          textAlign: 'center',
+          lineHeight: '12px',
+          color: '#ff4757',
+          fontWeight: 'bold',
+        }}
+      >
+        You
+      </div>
+    </div>
+  );
+
   return (
     <View style={[styles.container, style]}>
       {Platform.OS === 'web' && typeof window !== 'undefined' && (
-        <iframe 
-          src={mapUrl}
-          style={{ 
-            height: '100%', 
-            width: '100%', 
-            border: 'none',
-            borderRadius: '8px'
-          }}
-          title="OpenStreetMap"
-          allowFullScreen
-        />
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <iframe 
+            src={mapUrl}
+            style={{ 
+              height: '100%', 
+              width: '100%', 
+              border: 'none',
+              borderRadius: '8px'
+            }}
+            title="OpenStreetMap"
+            allowFullScreen
+          />
+          {!error && <CustomMarker />}
+        </div>
       )}
       
       {error && (
@@ -228,11 +277,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 8,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
   },
   errorText: {
     marginBottom: 12,
